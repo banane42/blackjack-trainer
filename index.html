@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Blackjack Trainer</title>
+<style>
+  :root {
+    --felt: #1d5c3f;
+    --felt-dark: #154630;
+    --panel: #12221b;
+    --text: #eef3ef;
+    --muted: #9fb5a8;
+    --good: #4ade80;
+    --bad: #f87171;
+    --push: #60a5fa;
+    --accent: #facc15;
+    --s: 2; /* sprite scale */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0b1510;
+    color: var(--text);
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid #23392e;
+  }
+  header h1 { font-size: 18px; margin: 0 auto 0 0; letter-spacing: .5px; }
+  .stat { text-align: center; min-width: 64px; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+  .layout {
+    display: grid; grid-template-columns: 340px minmax(0, 1fr) 300px; gap: 16px;
+    padding: 16px; max-width: 1640px; margin: 0 auto; align-items: start;
+  }
+  @media (max-width: 1280px) {
+    .layout { grid-template-columns: minmax(0, 1fr) 300px; }
+    .correction { grid-column: 1 / -1; }
+  }
+  @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+
+  .correction h2 { color: var(--bad); }
+  .correction .verdict { font-size: 15px; margin-bottom: 4px; }
+  .correction .verdict b { color: var(--bad); }
+  .correction .verdict em { color: var(--good); font-style: normal; font-weight: 700; }
+  .correction .why { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  /* Keep the column's space on wide screens so the table doesn't shift. */
+  .correction.idle { visibility: hidden; }
+  @media (max-width: 1280px) { .correction.idle { display: none; } }
+  table.chart.compact { font-size: 11px; width: 100%; }
+  table.chart.compact th, table.chart.compact td { min-width: 0; padding: 3px 1px; }
+  table.chart.compact th.section { font-size: 10px; padding: 2px 6px; }
+  table.chart td.dim { opacity: .22; }
+  table.chart th.hl { background: var(--accent); color: #111; }
+  table.chart td.target {
+    outline: 3px solid #fff; outline-offset: -1px; z-index: 1;
+    box-shadow: 0 0 0 5px var(--bad), 0 0 14px 6px rgba(248,113,113,.7);
+  }
+
+  .table {
+    background: radial-gradient(ellipse at center, var(--felt), var(--felt-dark));
+    border-radius: 24px; padding: 20px; min-height: 560px;
+    display: flex; flex-direction: column; gap: 16px;
+    box-shadow: inset 0 0 0 6px #3b2a1a, inset 0 0 40px rgba(0,0,0,.4);
+    transition: box-shadow .25s ease;
+  }
+  .table.won {
+    box-shadow: 0 0 0 5px var(--good), 0 0 28px 4px rgba(74,222,128,.55),
+                inset 0 0 0 6px #3b2a1a, inset 0 0 40px rgba(0,0,0,.4);
+  }
+  .table.lost {
+    box-shadow: 0 0 0 5px var(--bad), 0 0 28px 4px rgba(248,113,113,.55),
+                inset 0 0 0 6px #3b2a1a, inset 0 0 40px rgba(0,0,0,.4);
+  }
+  .table.push {
+    box-shadow: 0 0 0 5px var(--push), 0 0 28px 4px rgba(96,165,250,.55),
+                inset 0 0 0 6px #3b2a1a, inset 0 0 40px rgba(0,0,0,.4);
+  }
+  /* Per-hand outcome borders, used when a round has split hands. */
+  .hand.outcome-win  { border-color: var(--good); background: rgba(74,222,128,.10); }
+  .hand.outcome-lose { border-color: var(--bad);  background: rgba(248,113,113,.10); }
+  .hand.outcome-push { border-color: var(--push); background: rgba(96,165,250,.10); }
+  .area-label { font-size: 12px; color: #cfe3d6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .hands { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+  .hand {
+    padding: 10px 12px 8px; border-radius: 12px; border: 2px solid transparent;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .hand.active { border-color: var(--accent); background: rgba(250,204,21,.08); }
+  .cards { display: flex; min-height: calc(89px * var(--s)); }
+  .cards .card + .card { margin-left: calc(-30px * var(--s)); }
+  .card {
+    width: calc(57px * var(--s)); height: calc(89px * var(--s));
+    background-image: url("card-deck-spritesheet.png");
+    background-size: calc(741px * var(--s)) calc(356px * var(--s));
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.45));
+    animation: drop .18s ease-out;
+  }
+  .card.back {
+    background: repeating-linear-gradient(45deg, #9f1d2b 0 6px, #7a1420 6px 12px);
+    border: calc(3px * var(--s)) solid #f0ebe0; border-radius: calc(4px * var(--s));
+  }
+  @keyframes drop { from { transform: translateY(-12px); opacity: 0; } }
+  .total { font-size: 14px; font-weight: 600; background: rgba(0,0,0,.35); padding: 2px 10px; border-radius: 999px; }
+  .result { font-size: 13px; font-weight: 700; }
+  .result.win { color: var(--good); } .result.lose { color: var(--bad); } .result.push { color: var(--push); }
+
+  .dealer-area { text-align: center; }
+  .dealer-area .hand { display: inline-flex; }
+  .player-area { margin-top: auto; text-align: center; }
+
+  .feedback {
+    min-height: 54px; text-align: center; padding: 10px 14px; border-radius: 10px;
+    font-size: 15px; background: rgba(0,0,0,.25);
+  }
+  .feedback.good { background: rgba(74,222,128,.18); border: 1px solid rgba(74,222,128,.5); }
+  .feedback.bad { background: rgba(248,113,113,.18); border: 1px solid rgba(248,113,113,.6); }
+  .feedback small { display: block; color: #d4e4da; margin-top: 3px; }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+    padding: 10px 16px; border-radius: 10px; border: 0; color: #111;
+    background: #e5e7eb; min-width: 96px;
+  }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button kbd { font-size: 11px; opacity: .6; margin-left: 4px; }
+  button.hit { background: #86efac; } button.stand { background: #fca5a5; }
+  button.double { background: #67e8f9; } button.split { background: #fde047; }
+  button.surrender { background: #f5f5f4; } button.deal { background: var(--accent); min-width: 140px; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid #335043; min-width: 0; padding: 6px 10px; font-size: 13px; }
+
+  .stat.bank b { color: var(--accent); }
+  .betbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .bet-display { font-size: 15px; margin-right: 6px; }
+  .bet-display b { font-size: 20px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  button.chip {
+    min-width: 0; width: 52px; height: 52px; border-radius: 50%; padding: 0;
+    font-size: 14px; color: #fff; background: #dc2626;
+    border: 4px dashed rgba(255,255,255,.75); box-shadow: 0 2px 4px rgba(0,0,0,.4);
+  }
+  button.chip.c25 { background: #16a34a; } button.chip.c100 { background: #111827; }
+  button.chip.c500 { background: #7c3aed; }
+  .result.broke { color: var(--accent); }
+
+  aside { display: flex; flex-direction: column; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid #23392e; border-radius: 14px; padding: 14px 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  .cat-row { display: grid; grid-template-columns: 76px 1fr 72px; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+  .bar { height: 8px; background: #26372e; border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--good); }
+  .cat-row span:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .cat-row.sub { grid-template-columns: 64px 1fr 72px; margin: 3px 0 3px 12px; font-size: 12px; }
+  .cat-row.sub > span:first-child { color: var(--muted); }
+  .cat-row.sub .bar { height: 5px; }
+  .cat-row:not(.sub) + .cat-row.sub { margin-top: 2px; }
+  .cat-row.sub + .cat-row:not(.sub) { margin-top: 12px; }
+  .mistakes { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; font-size: 13px; }
+  .mistakes li { padding: 6px 0; border-bottom: 1px solid #1f3328; }
+  .mistakes li b { color: var(--bad); }
+  .mistakes li em { color: var(--good); font-style: normal; font-weight: 600; }
+  .empty { color: var(--muted); font-size: 13px; }
+  label.opt { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0; cursor: pointer; }
+  label.opt.volume { cursor: default; }
+  label.opt.volume input { flex: 1; min-width: 0; height: 6px; margin: 0; cursor: pointer; appearance: none; -webkit-appearance: none;
+    border-radius: 3px; background: linear-gradient(to right, var(--good) var(--fill, 100%), #26372e var(--fill, 100%)); }
+  label.opt.volume input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #f5f5f4; border: 0; }
+  label.opt.volume input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #f5f5f4; border: 0; }
+  label.opt.volume input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  #volume-pct { width: 52px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .opt-row { display: flex; align-items: center; gap: 6px; position: relative; }
+  .info {
+    display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; flex: none;
+    border: 1px solid var(--muted); border-radius: 50%; color: var(--muted);
+    font: italic 700 10px/1 Georgia, serif; cursor: help; user-select: none;
+  }
+  .info:hover, .info:focus { color: var(--accent); border-color: var(--accent); outline: none; }
+  .info .tip {
+    display: none; position: absolute; left: 0; right: 0; top: 100%; z-index: 10;
+    background: #0b1510; color: #d4e4da; border: 1px solid #335043; border-radius: 6px;
+    padding: 8px 10px; font: 400 12px/1.4 system-ui, sans-serif; cursor: default;
+    box-shadow: 0 4px 12px rgba(0,0,0,.4);
+  }
+  .info:hover .tip, .info:focus .tip { display: block; }
+
+  .credits { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 20px; }
+  .credits a { color: inherit; }
+  .chart-wrap { padding: 0 16px 24px; max-width: 1400px; margin: 0 auto; }
+  details.panel summary { cursor: pointer; font-weight: 600; }
+  .chart-peek { margin-top: 10px; padding: 6px 10px; font-size: 13px; border-radius: 6px; background: rgba(250,204,21,.15); border: 1px solid rgba(250,204,21,.5); }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin: 12px 0; color: var(--muted); }
+  .chart-legend span.code { display: inline-block; min-width: 30px; text-align: center; color: #111; font-weight: 700; border-radius: 4px; padding: 0 4px; margin-right: 4px; }
+  table.chart { border-collapse: collapse; margin: 0 auto; font-size: 13px; }
+  table.chart th, table.chart td { border: 1px solid #0b1510; padding: 4px 6px; text-align: center; min-width: 42px; }
+  table.chart th { background: #1c3127; font-weight: 600; }
+  table.chart th.section { background: #26402f; text-align: left; padding-left: 10px; }
+  table.chart td { color: #111; font-weight: 700; position: relative; }
+  table.chart td.last { outline: 3px solid var(--accent); outline-offset: -3px; }
+  table.chart td .miss {
+    position: absolute; top: -1px; right: -1px; font-size: 9px; line-height: 1;
+    background: #b91c1c; color: #fff; padding: 2px 3px; border-radius: 0 0 0 4px;
+  }
+  .c-S { background: #f87171; } .c-H { background: #4ade80; }
+  .c-D { background: #22d3ee; } .c-SP { background: #facc15; } .c-U { background: #f5f5f4; }
+
+  @media (max-width: 600px) {
+    :root { --s: 1; }
+    .table { padding: 12px; min-height: 420px; }
+    button { min-width: 0; padding: 10px 12px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>♠ Blackjack Strategy Trainer</h1>
+  <div class="stat"><b id="st-acc">–</b><span>Accuracy</span></div>
+  <div class="stat"><b id="st-dec">0</b><span>Decisions</span></div>
+  <div class="stat"><b id="st-streak">0</b><span>Streak</span></div>
+  <div class="stat"><b id="st-best">0</b><span>Best</span></div>
+  <div class="stat"><b id="st-hands">0</b><span>Hands</span></div>
+  <div class="stat"><b id="st-net">$0</b><span>Net won</span></div>
+  <div class="stat bank"><b id="st-bank">$1000</b><span>Bank</span></div>
+</header>
+
+<div class="layout">
+  <section class="panel correction idle" id="correction">
+    <h2>Correct play</h2>
+    <div id="correction-body"></div>
+  </section>
+
+  <main class="table" id="table">
+    <div class="dealer-area">
+      <div class="area-label">Dealer</div>
+      <div id="dealer"></div>
+    </div>
+
+    <div id="feedback" class="feedback">Press <b>Deal</b> (or Space) to start.</div>
+
+    <div class="player-area">
+      <div class="area-label">You</div>
+      <div id="hands" class="hands"></div>
+    </div>
+
+    <div class="betbar">
+      <div class="bet-display">Bet <b id="bet-amount">$0</b></div>
+      <button class="chip" data-chip="5">5</button>
+      <button class="chip c25" data-chip="25">25</button>
+      <button class="chip c100" data-chip="100">100</button>
+      <button class="chip c500" data-chip="500">500</button>
+      <button class="ghost" id="bet-clear">Clear</button>
+      <button class="ghost" id="bet-max">All in</button>
+    </div>
+
+    <div class="controls">
+      <button class="hit" data-act="H">Hit<kbd>H</kbd></button>
+      <button class="stand" data-act="S">Stand<kbd>S</kbd></button>
+      <button class="double" data-act="D">Double<kbd>D</kbd></button>
+      <button class="split" data-act="P">Split<kbd>P</kbd></button>
+      <button class="surrender" data-act="R">Surrender<kbd>R</kbd></button>
+      <button class="deal" id="deal">Deal<kbd>Space</kbd></button>
+    </div>
+  </main>
+
+  <aside>
+    <section class="panel">
+      <h2>Accuracy by hand type</h2>
+      <div id="cats"></div>
+    </section>
+    <section class="panel">
+      <h2>Recent mistakes</h2>
+      <ul id="mistakes" class="mistakes"></ul>
+    </section>
+    <section class="panel">
+      <h2>Options</h2>
+      <div class="opt-row">
+        <label class="opt"><input type="checkbox" id="opt-surrender" checked> Late surrender allowed</label>
+        <span class="info" tabindex="0" aria-label="About late surrender">i<span class="tip" role="tooltip">On your first two cards you may give up the hand and get half your bet back. "Late" means it's only offered after the dealer has checked for blackjack, and not after a split. Turning it off makes the chart's surrender cells (Uh/Us/Usp) use their fallback play.</span></span>
+      </div>
+      <div class="opt-row">
+        <label class="opt"><input type="checkbox" id="opt-h17" checked> Dealer hits soft 17</label>
+        <span class="info" tabindex="0" aria-label="About dealer hits soft 17">i<span class="tip" role="tooltip">When on (H17), the dealer takes another card on a soft 17 such as A-6. When off (S17), the dealer stands on every 17. H17 is slightly worse for the player. The strategy chart here is the H17 chart either way.</span></span>
+      </div>
+      <label class="opt"><input type="checkbox" id="opt-totals" checked> Show hand totals</label>
+      <label class="opt"><input type="checkbox" id="opt-dealer-delay" checked> Animate dealer draws</label>
+      <label class="opt volume">Volume <kbd>M</kbd>
+        <input type="range" id="opt-volume" min="0" max="100" step="5" value="100" aria-label="Sound effects volume">
+        <span id="volume-pct">100%</span></label>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+        <button class="ghost" id="reset">Reset stats</button>
+        <button class="ghost" id="reset-bank">Reset bank to $1000</button>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<div class="chart-wrap">
+  <details class="panel" id="chart-panel">
+    <summary>Strategy chart (red badges = your misses on that cell, outline = last decision)</summary>
+    <div class="chart-peek">While the chart is open, decisions for the current hand aren't counted in your stats. Close it before dealing to train for real.</div>
+    <div class="chart-legend">
+      <div><span class="code c-S">S</span>Stand</div>
+      <div><span class="code c-H">H</span>Hit</div>
+      <div><span class="code c-D">Dh</span>Double, else hit</div>
+      <div><span class="code c-D">Ds</span>Double, else stand</div>
+      <div><span class="code c-SP">SP</span>Split</div>
+      <div><span class="code c-U">Uh</span>Surrender, else hit</div>
+      <div><span class="code c-U">Us</span>Surrender, else stand</div>
+      <div><span class="code c-U">Usp</span>Surrender, else split</div>
+    </div>
+    <div id="chart"></div>
+  </details>
+</div>
+
+<footer class="credits">
+  Card art by John Riggles, a.k.a. "sudo_whoami", licensed
+  <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener">CC BY-SA 4.0</a>.
+</footer>
+
+<script src="sound.js"></script>
+<script src="trainer.js"></script>
+</body>
+</html>
