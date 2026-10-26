@@ -224,6 +224,7 @@ const OPTS_KEY = 'bjtrainer.opts.v1';
 // practice: 'hard' deals normally; 'soft' / 'pair' bias the player's first two cards toward that hand type.
 const opts = { surrender: true, h17: true, animate: true, showTotals: true, practice: 'hard' };
 const PRACTICE_BIAS = 0.75; // chance a biased deal is forced; the rest stay random so the hand type isn't a given
+const PAIR_EASY_WEIGHT = 0.4; // relative odds of a forced 10-10 or A-A vs. each of 2-2 … 9-9
 try {
   const o = JSON.parse(localStorage.getItem(OPTS_KEY));
   if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k];
@@ -265,11 +266,18 @@ function randomCard(pred) {
 // keeps its normal mix). Soft hands avoid A-10 (a natural, no decision).
 function playerOpening() {
   const cards = [draw(), draw()];
-  const special = cards[0].value === cards[1].value || cards.some(c => c.value === 11);
+  const pair = cards[0].value === cards[1].value;
+  // In pair practice a dealt 10-10 / A-A is swappable too, so those stay rare (see PAIR_EASY_WEIGHT).
+  const easyPair = pair && opts.practice === 'pair' && cards[0].value >= 10;
+  const special = (pair || cards.some(c => c.value === 11)) && !easyPair;
   if (opts.practice === 'hard' || special || Math.random() >= PRACTICE_BIAS) return cards;
   if (opts.practice === 'pair') {
-    const first = randomCard(() => true);
-    return [first, randomCard(c => c.value === first.value)];
+    // 10-10 (always stand) and A-A (always split) teach little, so forced pairs pick each of 2–9 equally and
+    // 10s/aces at PAIR_EASY_WEIGHT of that; otherwise 10-values would be 4 of every 13 pairs.
+    let roll = Math.random() * (8 + 2 * PAIR_EASY_WEIGHT);
+    const value = roll < 8 ? 2 + Math.floor(roll) : (roll -= 8) < PAIR_EASY_WEIGHT ? 10 : 11;
+    const first = randomCard(c => c.value === value);
+    return [first, randomCard(c => c.value === value)];
   }
   const soft = [randomCard(c => c.value === 11), randomCard(c => c.value >= 2 && c.value <= 9)];
   return Math.random() < 0.5 ? soft : soft.reverse();
