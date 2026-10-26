@@ -160,6 +160,15 @@
   .cat-row.sub .bar { height: 5px; }
   .cat-row:not(.sub) + .cat-row.sub { margin-top: 2px; }
   .cat-row.sub + .cat-row:not(.sub) { margin-top: 12px; }
+  .cat-row.practice { cursor: pointer; border-radius: 6px; padding: 2px 6px; margin-left: -6px; margin-right: -6px; border: 1px solid transparent; }
+  .cat-row.practice:hover { background: #1c3127; }
+  .cat-row.practice:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cat-row.practice.on { border-color: var(--accent); background: rgba(250,204,21,.1); }
+  .cat-row.practice.on > span:first-child { color: var(--accent); }
+  .cat-row.practice.on > span:first-child::after { content: ' ★'; font-size: 11px; }
+  .panel h2.opt-row { gap: 8px; }
+  .panel h2 .info { text-transform: none; letter-spacing: 0; }
+  .panel h2 .tip { text-transform: none; letter-spacing: 0; font-weight: 400; }
   .mistakes { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; font-size: 13px; }
   .mistakes li { padding: 6px 0; border-bottom: 1px solid #1f3328; }
   .mistakes li b { color: var(--bad); }
@@ -187,6 +196,8 @@
     box-shadow: 0 4px 12px rgba(0,0,0,.4);
   }
   .info:hover .tip, .info:focus .tip { display: block; }
+  .tip.bullets > span { display: block; padding-left: 12px; text-indent: -12px; }
+  .tip.bullets > span::before { content: '•'; display: inline-block; width: 12px; text-indent: 0; }
 
   .credits { text-align: center; font-size: 12px; color: var(--muted); padding: 0 16px 20px; }
   .credits a { color: inherit; }
@@ -268,7 +279,9 @@
 
   <aside>
     <section class="panel">
-      <h2>Accuracy by hand type</h2>
+      <h2 class="opt-row">Accuracy by hand type
+        <span class="info" tabindex="0" aria-label="About practice mode">i<span class="tip bullets" role="tooltip"><span>Click Soft or Pairs to deal more of that hand type</span><span>About 3 in 4 hands are biased; the rest stay random</span><span>Click Hard (or the active row) for normal dealing</span><span>Starts next deal; stats are scored the same</span></span></span>
+      </h2>
       <div id="cats"></div>
     </section>
     <section class="panel">

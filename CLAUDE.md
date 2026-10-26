@@ -42,7 +42,9 @@ Open `index.html` directly in a browser, or serve the directory (e.g. `python3 -
 - `bjtrainer.v1` — training stats (`loadStats` migrates older saves; bump/migrate when changing shape). Per-cell stats are keyed `"rowKey:col"`, so renaming row keys orphans saved data.
 - `bjtrainer.bank.v1` — bank and current bet, kept separate so "Reset stats" doesn't reset money.
 - `bjtrainer.sound.v2` — volume `{ volume, restore }` (owned by `sound.js`; migrates the old `bjtrainer.sound.v1` on/off boolean, `false` → muted). `Sound.volume` is 0–1, `Sound.toggleMute()` backs the M key.
-- `bjtrainer.opts.v1` — the `opts` checkboxes (surrender, H17, animation, show hand totals). Loaded over the defaults key by key, so adding an option needs no migration.
+- `bjtrainer.opts.v1` — the `opts` checkboxes (surrender, H17, animation, show hand totals) plus `practice` (`'hard'` | `'soft'` | `'pair'`). Loaded over the defaults key by key (type must match the default), so adding an option needs no migration.
+
+**Practice mode:** clicking the Soft/Pairs rows in "Accuracy by hand type" sets `opts.practice`; clicking Hard (or the active row) resets to `'hard'` = normal dealing. In `deal()`, `playerOpening()` forces the player's first two cards to that type with probability `PRACTICE_BIAS`, pulling matching cards out of the shoe via `drawWhere()`, which makes up a matching card once the shoe has none (soft = ace + 2–9, never A-10). Only the deal is biased; stats are scored the same.
 
 ## Testing changes
 

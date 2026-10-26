@@ -221,10 +221,13 @@ function addChip(amount) {
 // Game state
 // ---------------------------------------------------------------------------
 const OPTS_KEY = 'bjtrainer.opts.v1';
-const opts = { surrender: true, h17: true, animate: true, showTotals: true };
+// practice: 'hard' deals normally; 'soft' / 'pair' bias the player's first two cards toward that hand type.
+const opts = { surrender: true, h17: true, animate: true, showTotals: true, practice: 'hard' };
+const PRACTICE_BIAS = 0.75; // chance a biased deal is forced; the rest stay random so the hand type isn't a given
 try {
   const o = JSON.parse(localStorage.getItem(OPTS_KEY));
-  if (o) for (const k in opts) if (typeof o[k] === 'boolean') opts[k] = o[k];
+  if (o) for (const k in opts) if (typeof o[k] === typeof opts[k]) opts[k] = o[k];
+  if (!['hard', 'soft', 'pair'].includes(opts.practice)) opts.practice = 'hard';
 } catch (e) { /* ignore */ }
 function saveOpts() {
   try { localStorage.setItem(OPTS_KEY, JSON.stringify(opts)); } catch (e) { /* ignore */ }
@@ -245,6 +248,28 @@ const state = {
 function draw() {
   if (!state.shoe.length) state.shoe = newShoe();
   return state.shoe.pop();
+}
+
+// Pull the next card matching pred out of the shoe (searching from the top). Practice mode can use up a
+// shoe's 24 aces long before the cut card, so if none is left a matching card is made up instead.
+function drawWhere(pred) {
+  for (let i = state.shoe.length - 1; i >= 0; i--)
+    if (pred(state.shoe[i])) return state.shoe.splice(i, 1)[0];
+  for (;;) {
+    const c = makeCard(Math.floor(Math.random() * 13), Math.floor(Math.random() * 4));
+    if (pred(c)) return c;
+  }
+}
+
+// The player's opening two cards, biased toward opts.practice. Soft hands avoid A-10 (a natural, no decision).
+function playerOpening() {
+  if (opts.practice === 'hard' || Math.random() >= PRACTICE_BIAS) return [draw(), draw()];
+  if (opts.practice === 'pair') {
+    const first = draw();
+    return [first, drawWhere(c => c.value === first.value)];
+  }
+  const cards = [drawWhere(c => c.value === 11), drawWhere(c => c.value >= 2 && c.value <= 9)];
+  return Math.random() < 0.5 ? cards : cards.reverse();
 }
 
 function currentHand() { return state.hands[state.active]; }
@@ -290,10 +315,8 @@ function deal() {
   state.correction = null;
   state.outcome = null;
   state.peeked = $('chart-panel').open;
-  state.hands = [{ cards: [draw()], bet: wallet.bet, done: false, fromSplit: false, result: null }];
-  state.dealer = [draw()];
-  state.hands[0].cards.push(draw());
-  state.dealer.push(draw());
+  state.hands = [{ cards: playerOpening(), bet: wallet.bet, done: false, fromSplit: false, result: null }];
+  state.dealer = [draw(), draw()];
   state.active = 0;
   state.holeHidden = true;
   state.phase = 'player';
@@ -612,6 +635,12 @@ function render() {
   renderCorrection();
 }
 
+const PRACTICE_TIPS = {
+  hard: () => opts.practice === 'hard' ? 'Normal dealing (no bias).' : 'Click to go back to normal dealing.',
+  soft: on => on ? 'Dealing more soft hands. Click to go back to normal dealing.' : 'Click to deal more soft hands (an ace plus 2–9).',
+  pair: on => on ? 'Dealing more pairs. Click to go back to normal dealing.' : 'Click to deal more pairs.',
+};
+
 function pct(c, n) { return n ? Math.round((c / n) * 100) + '%' : '–'; }
 
 function renderStats() {
@@ -622,12 +651,16 @@ function renderStats() {
   $('st-hands').textContent = stats.hands;
   $('st-net').textContent = (stats.won > 0 ? '+' : '') + money(stats.won);
 
-  const catRow = (name, { n, c }, sub = false) => {
+  const catRow = (name, { n, c }, cls = '', attrs = '') => {
     const w = n ? (c / n) * 100 : 0;
-    return `<div class="cat-row${sub ? ' sub' : ''}"><span>${name}</span><div class="bar"><i style="width:${w}%"></i></div><span>${c}/${n} · ${pct(c, n)}</span></div>`;
+    return `<div class="cat-row${cls}"${attrs}><span>${name}</span><div class="bar"><i style="width:${w}%"></i></div><span>${c}/${n} · ${pct(c, n)}</span></div>`;
   };
-  $('cats').innerHTML = [['hard', 'Hard'], ['soft', 'Soft'], ['pair', 'Pairs']].map(([k, name]) =>
-    catRow(name, stats.cats[k]) + CATEGORY_ACTIONS[k].map(a => catRow(ACTION_NAMES[a], stats.cats[k].acts[a], true)).join('')).join('');
+  $('cats').innerHTML = [['hard', 'Hard'], ['soft', 'Soft'], ['pair', 'Pairs']].map(([k, name]) => {
+    const on = opts.practice === k && k !== 'hard';
+    const attrs = ` data-practice="${k}" role="button" tabindex="0" aria-pressed="${on}" title="${PRACTICE_TIPS[k](on)}"`;
+    return catRow(name, stats.cats[k], on ? ' practice on' : ' practice', attrs) +
+      CATEGORY_ACTIONS[k].map(a => catRow(ACTION_NAMES[a], stats.cats[k].acts[a], ' sub')).join('');
+  }).join('');
 
   $('mistakes').innerHTML = stats.mistakes.length
     ? stats.mistakes.slice(0, 25).map(m =>
@@ -727,6 +760,23 @@ $('chart-panel').addEventListener('toggle', () => {
     state.peeked = true;
     render();
   }
+});
+function setPractice(k) {
+  opts.practice = k === opts.practice ? 'hard' : k;
+  saveOpts();
+  render();
+}
+$('cats').addEventListener('click', e => {
+  const row = e.target.closest('[data-practice]');
+  if (row) setPractice(row.dataset.practice);
+});
+$('cats').addEventListener('keydown', e => {
+  const row = e.target.closest('[data-practice]');
+  if (!row || (e.key !== 'Enter' && e.key !== ' ')) return;
+  e.preventDefault();
+  e.stopPropagation(); // don't let Space/Enter also deal
+  setPractice(row.dataset.practice);
+  $('cats').querySelector(`[data-practice="${row.dataset.practice}"]`).focus();
 });
 // Browsers can restore checkbox state on reload without firing 'change'; opts is the source of truth.
 for (const [id, key] of [['opt-surrender', 'surrender'], ['opt-h17', 'h17'], ['opt-totals', 'showTotals'], ['opt-dealer-delay', 'animate']]) {
