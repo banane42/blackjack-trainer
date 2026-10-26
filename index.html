@@ -166,6 +166,15 @@
   .cat-row.practice.on { border-color: var(--accent); background: rgba(250,204,21,.1); }
   .cat-row.practice.on > span:first-child { color: var(--accent); }
   .cat-row.practice.on > span:first-child::after { content: ' ★'; font-size: 11px; }
+  .cats-wrap { position: relative; }
+  .cats-wrap.paused #cats { opacity: .35; filter: grayscale(1); }
+  .cats-paused {
+    display: none; position: absolute; inset: 0; align-items: center; justify-content: center;
+    padding: 12px; text-align: center; font-size: 13px; line-height: 1.4; color: #f5f5f4;
+    pointer-events: none; /* practice rows underneath stay clickable */
+  }
+  .cats-paused span { background: rgba(11,21,16,.9); border: 1px solid #335043; border-radius: 8px; padding: 8px 12px; }
+  .cats-wrap.paused .cats-paused { display: flex; }
   .panel h2.opt-row { gap: 8px; }
   .panel h2 .info { text-transform: none; letter-spacing: 0; }
   .panel h2 .tip { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -282,7 +291,10 @@
       <h2 class="opt-row">Accuracy by hand type
         <span class="info" tabindex="0" aria-label="About practice mode">i<span class="tip bullets" role="tooltip"><span>Click Soft or Pairs to deal more of that hand type</span><span>About 3 in 4 hands are biased; the rest stay random</span><span>Click Hard (or the active row) for normal dealing</span><span>Starts next deal; stats are scored the same</span></span></span>
       </h2>
-      <div id="cats"></div>
+      <div class="cats-wrap" id="cats-wrap">
+        <div id="cats"></div>
+        <div class="cats-paused" id="cats-paused"></div>
+      </div>
     </section>
     <section class="panel">
       <h2>Recent mistakes</h2>

@@ -662,6 +662,14 @@ function renderStats() {
       CATEGORY_ACTIONS[k].map(a => catRow(ACTION_NAMES[a], stats.cats[k].acts[a], ' sub')).join('');
   }).join('');
 
+  // Decisions aren't counted while the chart is open, or for the rest of a hand it was opened during.
+  const chartOpen = $('chart-panel').open;
+  const peekedHand = state.peeked && (state.phase === 'player' || state.phase === 'dealer');
+  $('cats-wrap').classList.toggle('paused', chartOpen || peekedHand);
+  $('cats-paused').innerHTML = chartOpen
+    ? '<span>Strategy chart is open, so decisions aren\'t counted in your stats. Close it before the next deal to count again.</span>'
+    : peekedHand ? '<span>Strategy chart was opened this hand, so its decisions aren\'t counted. Counting resumes next deal.</span>' : '';
+
   $('mistakes').innerHTML = stats.mistakes.length
     ? stats.mistakes.slice(0, 25).map(m =>
         `<li>${m.situation}: <b>${m.chose}</b> → <em>${m.correct}</em> <span class="empty">(${m.code})</span></li>`).join('')
@@ -756,10 +764,8 @@ $('reset-bank').addEventListener('click', () => {
   render();
 });
 $('chart-panel').addEventListener('toggle', () => {
-  if ($('chart-panel').open && state.phase === 'player' && !state.peeked) {
-    state.peeked = true;
-    render();
-  }
+  if ($('chart-panel').open && state.phase === 'player') state.peeked = true;
+  render(); // also refreshes the "not counted" overlay on the accuracy panel
 });
 function setPractice(k) {
   opts.practice = k === opts.practice ? 'hard' : k;
