@@ -250,26 +250,29 @@ function draw() {
   return state.shoe.pop();
 }
 
-// Pull the next card matching pred out of the shoe (searching from the top). Practice mode can use up a
-// shoe's 24 aces long before the cut card, so if none is left a matching card is made up instead.
-function drawWhere(pred) {
-  for (let i = state.shoe.length - 1; i >= 0; i--)
-    if (pred(state.shoe[i])) return state.shoe.splice(i, 1)[0];
+// A made-up card (any rank/suit equally likely) matching pred. Forced practice hands use these rather than
+// pulling from the shoe, which would drain its aces and low cards and skew every later deal toward tens.
+function randomCard(pred) {
   for (;;) {
     const c = makeCard(Math.floor(Math.random() * 13), Math.floor(Math.random() * 4));
     if (pred(c)) return c;
   }
 }
 
-// The player's opening two cards, biased toward opts.practice. Soft hands avoid A-10 (a natural, no decision).
+// The player's opening two cards, biased toward opts.practice. A normal deal is drawn first and kept if it's
+// already a pair or has an ace (soft, or a natural), so the other practice type still shows up at its usual
+// rate; only plain hard hands get swapped for the practiced type (they're burned, not returned, so the shoe
+// keeps its normal mix). Soft hands avoid A-10 (a natural, no decision).
 function playerOpening() {
-  if (opts.practice === 'hard' || Math.random() >= PRACTICE_BIAS) return [draw(), draw()];
+  const cards = [draw(), draw()];
+  const special = cards[0].value === cards[1].value || cards.some(c => c.value === 11);
+  if (opts.practice === 'hard' || special || Math.random() >= PRACTICE_BIAS) return cards;
   if (opts.practice === 'pair') {
-    const first = draw();
-    return [first, drawWhere(c => c.value === first.value)];
+    const first = randomCard(() => true);
+    return [first, randomCard(c => c.value === first.value)];
   }
-  const cards = [drawWhere(c => c.value === 11), drawWhere(c => c.value >= 2 && c.value <= 9)];
-  return Math.random() < 0.5 ? cards : cards.reverse();
+  const soft = [randomCard(c => c.value === 11), randomCard(c => c.value >= 2 && c.value <= 9)];
+  return Math.random() < 0.5 ? soft : soft.reverse();
 }
 
 function currentHand() { return state.hands[state.active]; }
